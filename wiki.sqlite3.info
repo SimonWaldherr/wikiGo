@@ -1,0 +1,25 @@
+Table: wiki
+Name        Type  Primary  NotNull
+id          int   true     true
+name        text  false    true
+content     text  false    true
+timestamp   int   false    true
+checked     int   false    false
+user        text  false    false
+ip          text  false    false
+
+Table: user
+Name        Type  Primary  NotNull
+name        text  false    true
+fullname    text  false    true
+regTime     int   false    true
+logTime     int   false    true
+salt        int   false    true
+password    text  false    true
+
+Table: session
+Name        Type  Primary  NotNull
+sessionid   int   true     true
+username    int   false    true
+timestamp   int   false    true
+fingerprint int   false    true

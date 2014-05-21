@@ -16,8 +16,8 @@ import (
 )
 
 var (
-	templates = template.Must(template.ParseFiles("edit.html", "view.html", "index.html"))
-	validPath = regexp.MustCompile("^/(edit|save|view)/([a-zA-Z0-9_()]+)$")
+	templates = template.Must(template.ParseFiles("edit.html", "view.html", "user.html", "search.html", "index.html"))
+	validPath = regexp.MustCompile("^/(edit|save|view|user|search)/([a-zA-Z0-9_()]+)$")
 	sql, _    = sqlite3.Open("./wiki.sqlite3")
 )
 
@@ -82,6 +82,27 @@ func viewHandler(w http.ResponseWriter, r *http.Request, title string) {
 	renderTemplate(w, "view", p)
 }
 
+func userHandler(w http.ResponseWriter, r *http.Request, title string) {
+	p := &Page{Title: "", Body: ""}
+	renderTemplate(w, "user", p)
+}
+
+func searchHandler(w http.ResponseWriter, r *http.Request, title string) {
+	var qu Qu
+	q, _ := sql.Query("SELECT id, name, content, timestamp FROM wiki WHERE name like '%" + title + "%' GROUP BY name ORDER BY timestamp DESC;")
+	retstr := ""
+	ioeof := false
+	for ioeof != true {
+		q.Scan(&qu.Id, &qu.Name, &qu.Content, &qu.Timestamp)
+		retstr += "<li><a href=\"/view/" + qu.Name + "\">" + qu.Name + "</a></li>"
+		if q.Next() == io.EOF {
+			ioeof = true
+		}
+	}
+	retstr = "<ul>" + retstr + "</ul>"
+	renderTemplate(w, "search", &Page{Title: title, Body: retstr})
+}
+
 func editHandler(w http.ResponseWriter, r *http.Request, title string) {
 	p, _ := loadSource(title)
 	renderTemplate(w, "edit", p)
@@ -110,9 +131,13 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 	var qu Qu
 	q, _ := sql.Query("SELECT id, name, content, timestamp FROM wiki GROUP BY name ORDER BY timestamp DESC;")
 	retstr := ""
-	for q.Next() != io.EOF {
+	ioeof := false
+	for ioeof != true {
 		q.Scan(&qu.Id, &qu.Name, &qu.Content, &qu.Timestamp)
 		retstr += "<li><a href=\"./view/" + qu.Name + "\">" + qu.Name + "</a></li>"
+		if q.Next() == io.EOF {
+			ioeof = true
+		}
 	}
 	retstr = "<ul>" + retstr + "</ul>"
 	renderTemplate(w, "index", &Page{Title: qu.Name, Body: retstr})
@@ -151,14 +176,16 @@ func main() {
 	}
 	server := &http.Server{
 		Addr:           port,
-		ReadTimeout:    10 * time.Second,
-		WriteTimeout:   10 * time.Second,
+		ReadTimeout:    20 * time.Second,
+		WriteTimeout:   20 * time.Second,
 		MaxHeaderBytes: 1 << 20,
 	}
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./static/"))))
 	http.HandleFunc("/view/", makeHandler(viewHandler))
 	http.HandleFunc("/edit/", makeHandler(editHandler))
 	http.HandleFunc("/save/", makeHandler(saveHandler))
+	http.HandleFunc("/user/", makeHandler(userHandler))
+	http.HandleFunc("/search/", makeHandler(searchHandler))
 	http.HandleFunc("/", makeHandler(viewHandler))
 	server.ListenAndServe()
 }
