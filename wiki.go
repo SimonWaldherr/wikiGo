@@ -4,7 +4,7 @@ import (
 	"flag"
 	"fmt"
 	mmd "github.com/SimonWaldherr/micromarkdownGo"
-	"github.com/mxk/go-sqlite/sqlite3"
+	sqlite "github.com/mxk/go-sqlite/sqlite3"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -18,7 +18,7 @@ import (
 var (
 	templates = template.Must(template.ParseFiles("edit.html", "view.html", "user.html", "search.html", "index.html"))
 	validPath = regexp.MustCompile("^/(edit|save|view|user|search)/([a-zA-Z0-9_()]+)$")
-	sql, _    = sqlite3.Open("./wiki.sqlite3")
+	sql, _    = sqlite.Open("./wiki.sqlite3")
 )
 
 type Page struct {
@@ -26,7 +26,7 @@ type Page struct {
 	Body  string
 }
 
-type Qu struct {
+type PagesQuery struct {
 	Id        int
 	Name      string
 	Content   string
@@ -44,7 +44,7 @@ func (p *Page) saveCache() error {
 }
 
 func loadSource(title string) (*Page, error) {
-	var qu Qu
+	var qu PagesQuery
 	q, err := sql.Query("SELECT * FROM wiki WHERE name = '" + title + "' ORDER BY timestamp DESC LIMIT 1;")
 	if err != nil {
 		return &Page{Title: title, Body: ""}, nil
@@ -74,6 +74,8 @@ func renderTemplate(w http.ResponseWriter, tmpl string, p *Page) {
 }
 
 func viewHandler(w http.ResponseWriter, r *http.Request, title string) {
+	w.Header().Set("Access-Control-Allow-Methods", "GET")
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	p, err := loadCache(title)
 	if err != nil {
 		http.Redirect(w, r, "/edit/"+title, http.StatusFound)
@@ -88,7 +90,7 @@ func userHandler(w http.ResponseWriter, r *http.Request, title string) {
 }
 
 func searchHandler(w http.ResponseWriter, r *http.Request, title string) {
-	var qu Qu
+	var qu PagesQuery
 	q, _ := sql.Query("SELECT id, name, content, timestamp FROM wiki WHERE name like '%" + title + "%' GROUP BY name ORDER BY timestamp DESC;")
 	retstr := ""
 	ioeof := false
@@ -104,12 +106,18 @@ func searchHandler(w http.ResponseWriter, r *http.Request, title string) {
 }
 
 func editHandler(w http.ResponseWriter, r *http.Request, title string) {
+	w.Header().Set("Access-Control-Allow-Methods", "GET")
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	p, _ := loadSource(title)
 	renderTemplate(w, "edit", p)
 }
 
 func saveHandler(w http.ResponseWriter, r *http.Request, title string) {
-	body := r.FormValue("body")
+	w.Header().Set("Access-Control-Allow-Methods", "POST")
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	r.ParseForm()
+	body := r.PostFormValue("body")
+	body = strings.Replace(body, "\r\n", "\n", -1)
 	p := &Page{Title: title, Body: body}
 	err := p.saveSource(r)
 	if err != nil {
@@ -128,7 +136,7 @@ func saveHandler(w http.ResponseWriter, r *http.Request, title string) {
 }
 
 func rootHandler(w http.ResponseWriter, r *http.Request) {
-	var qu Qu
+	var qu PagesQuery
 	q, _ := sql.Query("SELECT id, name, content, timestamp FROM wiki GROUP BY name ORDER BY timestamp DESC;")
 	retstr := ""
 	ioeof := false
@@ -151,7 +159,7 @@ func makeHandler(fn func(http.ResponseWriter, *http.Request, string)) http.Handl
 			http.NotFound(w, r)
 			return
 		} else if r.URL.Path == "/" {
-			var qu Qu
+			var qu PagesQuery
 			q, _ := sql.Query("SELECT id, name, content, timestamp FROM wiki GROUP BY name ORDER BY timestamp DESC;")
 			q.Scan(&qu.Id, &qu.Name, &qu.Content, &qu.Timestamp)
 			retstr := ""
