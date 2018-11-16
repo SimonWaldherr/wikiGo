@@ -1,20 +1,20 @@
-#wikiGo
+# wikiGo
 
-##demo
+## demo
 
 ```sh
 make
 ```
 
-##import
+## import
 
 [µmarkdown](https://github.com/SimonWaldherr/micromarkdownGo)  
 [go-sqlite](https://github.com/mxk/go-sqlite/sqlite3)
 
-##license
+## license
 
 [MIT](https://raw.githubusercontent.com/SimonWaldherr/wikiGo/master/LICENSE)
 
-##idea
+## idea
 
 [based on the idea of golang.org/doc/articles/wiki/](http://golang.org/doc/articles/wiki/)
