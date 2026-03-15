@@ -8,7 +8,6 @@ import (
 "net"
 "net/http"
 "regexp"
-"strconv"
 "strings"
 "time"
 
@@ -21,7 +20,7 @@ templates = template.Must(template.ParseFiles(
 "layout.html", "edit.html", "view.html", "user.html",
 "search.html", "index.html", "history.html", "all.html",
 ))
-validPath = regexp.MustCompile(`^/(edit|save|view|user|history)/([a-zA-Z0-9_.()–-]+)$`)
+validPath = regexp.MustCompile(`^/(edit|save|view|user|history)/([a-zA-Z0-9_.()-]+)$`)
 db, _     = sqlite.Open("./wiki.sqlite3")
 )
 
@@ -60,10 +59,6 @@ Timestamp int64
 IP        string
 }
 
-// sqlEscape escapes single quotes for use in SQLite string literals.
-func sqlEscape(s string) string {
-return strings.ReplaceAll(s, "'", "''")
-}
 
 // formatTime converts a Unix timestamp to a human-readable German date string.
 func formatTime(ts int64) string {
@@ -98,26 +93,31 @@ break
 }
 }
 
-// getPages returns pages from the wiki table, grouped by name and ordered by timestamp DESC.
+// getPages returns pages from the wiki table, one entry per page name (latest timestamp),
+// ordered by most recently modified.
 func getPages(limit int) []PageInfo {
 var pages []PageInfo
-limitClause := ""
+// Use MAX(timestamp) to guarantee we get the correct latest timestamp per page name.
+sqlStr := "SELECT name, MAX(timestamp) AS ts FROM wiki GROUP BY name ORDER BY ts DESC"
+var args []interface{}
 if limit > 0 {
-limitClause = " LIMIT " + strconv.Itoa(limit)
+sqlStr += " LIMIT ?"
+args = append(args, limit)
 }
-q, err := db.Query("SELECT id, name, content, timestamp FROM wiki GROUP BY name ORDER BY timestamp DESC" + limitClause + ";")
+q, err := db.Query(sqlStr+";", args...)
 if err != nil {
 return pages
 }
 iterRows(q, func(s *sqlite.Stmt) bool {
-var row dbRow
-if err := s.Scan(&row.Id, &row.Name, &row.Content, &row.Timestamp); err != nil {
+var name string
+var ts int64
+if err := s.Scan(&name, &ts); err != nil {
 return false
 }
 pages = append(pages, PageInfo{
-Name:      row.Name,
-TimeStr:   formatTime(row.Timestamp),
-Timestamp: row.Timestamp,
+Name:    name,
+TimeStr: formatTime(ts),
+Timestamp: ts,
 })
 return true
 })
@@ -127,7 +127,7 @@ return pages
 // loadSource fetches the latest raw Markdown content for a page.
 // Returns ("", nil) when the page does not exist yet.
 func loadSource(title string) (string, int64, error) {
-q, err := db.Query("SELECT id, name, content, timestamp, ip FROM wiki WHERE name = '" + sqlEscape(title) + "' ORDER BY timestamp DESC LIMIT 1;")
+q, err := db.Query("SELECT id, name, content, timestamp, ip FROM wiki WHERE name = ? ORDER BY timestamp DESC LIMIT 1;", title)
 if err != nil {
 return "", 0, err
 }
@@ -141,7 +141,7 @@ return row.Content, row.Timestamp, nil
 // loadHistory returns all revisions for a given page, newest first.
 func loadHistory(title string) []PageRevision {
 var history []PageRevision
-q, err := db.Query("SELECT id, name, content, timestamp, ip FROM wiki WHERE name = '" + sqlEscape(title) + "' ORDER BY timestamp DESC;")
+q, err := db.Query("SELECT id, name, content, timestamp, ip FROM wiki WHERE name = ? ORDER BY timestamp DESC;", title)
 if err != nil {
 return history
 }
@@ -162,12 +162,9 @@ return history
 
 // saveSource inserts a new revision of a page into the database.
 func saveSource(title, body, ip string) error {
-ts := strconv.FormatInt(time.Now().Unix(), 10)
-return db.Exec("INSERT INTO wiki (name, content, timestamp, ip) VALUES('" +
-sqlEscape(title) + "', '" +
-sqlEscape(body) + "', " +
-ts + ", '" +
-sqlEscape(ip) + "');")
+ts := time.Now().Unix()
+return db.Exec("INSERT INTO wiki (name, content, timestamp, ip) VALUES(?, ?, ?, ?);",
+title, body, ts, ip)
 }
 
 // renderTemplate executes the named template and writes the result to w.
@@ -271,17 +268,19 @@ http.Redirect(w, r, "/", http.StatusFound)
 return
 }
 
-escaped := sqlEscape(query)
-sqlQuery := "SELECT id, name, content, timestamp FROM wiki WHERE name LIKE '%" + escaped +
-"%' OR content LIKE '%" + escaped + "%' GROUP BY name ORDER BY timestamp DESC;"
-
-q, err := db.Query(sqlQuery)
+// Use a subquery to get the most recent revision per page, then filter.
+likeArg := "%" + query + "%"
+sqlQuery := "SELECT w.name, w.content, w.timestamp FROM wiki w " +
+"INNER JOIN (SELECT name, MAX(timestamp) AS ts FROM wiki GROUP BY name) latest " +
+"ON w.name = latest.name AND w.timestamp = latest.ts " +
+"WHERE w.name LIKE ? OR w.content LIKE ? ORDER BY w.timestamp DESC;"
+q, err := db.Query(sqlQuery, likeArg, likeArg)
 var buf strings.Builder
 count := 0
 if err == nil {
 iterRows(q, func(s *sqlite.Stmt) bool {
 var row dbRow
-if err := s.Scan(&row.Id, &row.Name, &row.Content, &row.Timestamp); err != nil {
+if err := s.Scan(&row.Name, &row.Content, &row.Timestamp); err != nil {
 return false
 }
 count++
@@ -310,37 +309,55 @@ renderTemplate(w, "search", data)
 
 // buildExcerpt returns a short snippet of text around the first occurrence of query.
 // Special HTML characters are escaped; the query match is highlighted with <mark>.
+// Uses rune-based slicing to avoid splitting multi-byte UTF-8 characters.
 func buildExcerpt(content, query string, maxLen int) string {
-lower := strings.ToLower(content)
-lowerQ := strings.ToLower(query)
-idx := strings.Index(lower, lowerQ)
+runes := []rune(content)
+lowerRunes := []rune(strings.ToLower(content))
+queryRunes := []rune(strings.ToLower(query))
+// Find first occurrence of query in the rune slice.
+idx := -1
+for i := 0; i <= len(lowerRunes)-len(queryRunes); i++ {
+match := true
+for j, qr := range queryRunes {
+if lowerRunes[i+j] != qr {
+match = false
+break
+}
+}
+if match {
+idx = i
+break
+}
+}
 if idx == -1 {
-// No match in content; return beginning
-if len(content) > maxLen {
-content = content[:maxLen] + "…"
+// No match in content; return beginning.
+if len(runes) > maxLen {
+return template.HTMLEscapeString(string(runes[:maxLen])) + "…"
 }
 return template.HTMLEscapeString(content)
 }
-start := idx - 60
+const ctxBefore = 60
+const ctxAfter = 120
+start := idx - ctxBefore
 if start < 0 {
 start = 0
 }
-end := idx + len(query) + 120
-if end > len(content) {
-end = len(content)
+end := idx + len(queryRunes) + ctxAfter
+if end > len(runes) {
+end = len(runes)
 }
 prefix := ""
 if start > 0 {
 prefix = "…"
 }
 suffix := ""
-if end < len(content) {
+if end < len(runes) {
 suffix = "…"
 }
-before := template.HTMLEscapeString(content[start:idx])
-match := template.HTMLEscapeString(content[idx : idx+len(query)])
-after := template.HTMLEscapeString(content[idx+len(query) : end])
-return prefix + before + "<mark>" + match + "</mark>" + after + suffix
+before := template.HTMLEscapeString(string(runes[start:idx]))
+matchStr := template.HTMLEscapeString(string(runes[idx : idx+len(queryRunes)]))
+after := template.HTMLEscapeString(string(runes[idx+len(queryRunes) : end]))
+return prefix + before + "<mark>" + matchStr + "</mark>" + after + suffix
 }
 
 // previewHandler renders Markdown to HTML for the live editor preview.
@@ -379,7 +396,9 @@ port = "8080"
 addr := ":" + port
 
 // Ensure the wiki table exists.
-_ = db.Exec("CREATE TABLE IF NOT EXISTS wiki (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, content TEXT, timestamp INTEGER, ip TEXT);")
+if err := db.Exec("CREATE TABLE IF NOT EXISTS wiki (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, content TEXT, timestamp INTEGER, ip TEXT);"); err != nil {
+fmt.Printf("Warnung: Tabellen-Erstellung fehlgeschlagen: %v\n", err)
+}
 
 server := &http.Server{
 Addr:           addr,

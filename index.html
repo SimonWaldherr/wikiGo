@@ -69,7 +69,7 @@
 (function(){
   function goNew(e, input) {
     e.preventDefault();
-    var name = input.value.trim().replace(/[^a-zA-Z0-9_().–-]+/g, '_').replace(/^_+|_+$/g, '');
+    var name = input.value.trim().replace(/[^a-zA-Z0-9_.()-]+/g, '_').replace(/^_+|_+$/g, '');
     if (name) window.location = '/edit/' + encodeURIComponent(name);
   }
   var sf = document.getElementById('sidebar-new-form');

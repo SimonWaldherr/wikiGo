@@ -73,7 +73,7 @@
   if (form) {
     form.addEventListener('submit', function(e) {
       e.preventDefault();
-      var name = input.value.trim().replace(/[^a-zA-Z0-9_().–-]+/g, '_').replace(/^_+|_+$/g, '');
+      var name = input.value.trim().replace(/[^a-zA-Z0-9_.()-]+/g, '_').replace(/^_+|_+$/g, '');
       if (name) window.location = '/edit/' + encodeURIComponent(name);
     });
   }
