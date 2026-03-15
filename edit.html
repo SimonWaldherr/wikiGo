@@ -1,19 +1,57 @@
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset='utf-8'>
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <title>goWiki - edit: {{.Title}}</title>
-    <link href="/static/style.css" media="all" rel="stylesheet" type="text/css" />
-  </head>
-  <body>
-    <h1><a href="/">goWiki</a></h1>
-    <div id="content">
-      <h2>Editing {{.Title}}</h2>
+{{template "header" .}}
+<div class="content-wrapper full-width">
+  <main class="main-content">
+    <div class="breadcrumb">
+      <a href="/">Startseite</a>
+      <span class="breadcrumb-sep">›</span>
+      <a href="/view/{{.Title}}">{{.Title}}</a>
+      <span class="breadcrumb-sep">›</span>
+      <span>Bearbeiten</span>
+    </div>
+    <div class="content-header">
+      <h1 class="page-title">✏️ {{.Title}}</h1>
+    </div>
+    <div class="edit-form">
       <form action="/save/{{.Title}}" method="POST">
-      <div><textarea name="body" rows="20" cols="80">{{println .Body}}</textarea></div>
-      <div><input type="submit" value="Save"></div>
+        <div class="form-group">
+          <div class="markdown-editor">
+            <div class="editor-pane">
+              <div class="pane-header">
+                <span>Markdown-Quelltext</span>
+                <button type="button" class="toolbar-btn" onclick="insertMd('**','**')" title="Fett">B</button>
+                <button type="button" class="toolbar-btn" onclick="insertMd('*','*')" title="Kursiv"><em>I</em></button>
+                <button type="button" class="toolbar-btn" onclick="insertMd('`','`')" title="Code">&#96;&#96;</button>
+                <button type="button" class="toolbar-btn" onclick="insertMd('\n## ','')" title="Überschrift">H2</button>
+                <button type="button" class="toolbar-btn" onclick="insertMd('\n- ','')" title="Liste">•</button>
+                <button type="button" class="toolbar-btn" onclick="insertMd('[','](url)')" title="Link">🔗</button>
+              </div>
+              <textarea id="editor-textarea" name="body" rows="24" spellcheck="false">{{.Body}}</textarea>
+            </div>
+            <div class="preview-pane">
+              <div class="pane-header"><span>Vorschau</span></div>
+              <div id="preview-content" class="wiki-content"><em class="preview-placeholder">Beginne zu tippen…</em></div>
+            </div>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">💾 Speichern</button>
+          <a href="/view/{{.Title}}" class="btn btn-secondary">Abbrechen</a>
+          <span class="form-tip">Markdown wird unterstützt</span>
+        </div>
       </form>
     </div>
-  </body>
-</html>
+  </main>
+</div>
+
+<script>
+function insertMd(before, after) {
+  var ta = document.getElementById('editor-textarea');
+  var start = ta.selectionStart, end = ta.selectionEnd;
+  var sel = ta.value.substring(start, end);
+  ta.setRangeText(before + sel + after, start, end, 'select');
+  ta.focus();
+  // trigger preview update
+  ta.dispatchEvent(new Event('input'));
+}
+</script>
+{{template "footer" .}}

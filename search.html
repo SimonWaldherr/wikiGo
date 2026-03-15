@@ -1,16 +1,51 @@
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset='utf-8'>
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <title>goWiki - search {{.Title}}</title>
-    <link href="/static/style.css" media="all" rel="stylesheet" type="text/css" />
-  </head>
-  <body>
-    <h1><a href="/">goWiki</a></h1>
-    <div id="content">
-      <h2>Search {{.Title}}</h2>
-      <div>{{println .Body}}</div>
+{{template "header" .}}
+<div class="content-wrapper">
+  <main class="main-content">
+    <div class="search-header">
+      <h1 class="page-title">🔍 Suchergebnisse</h1>
+      {{if .Query}}<div class="search-count">Suche nach: <strong>{{.Query}}</strong>{{if .ResultCount}} &mdash; {{.ResultCount}} Ergebnis(se){{end}}</div>{{end}}
     </div>
-  </body>
-</html>
+
+    {{if .HTML}}
+    <div class="search-results">{{.HTML}}</div>
+    {{else}}
+    <div class="no-results">
+      <h3>Keine Ergebnisse gefunden</h3>
+      <p>Für <strong>{{.Query}}</strong> wurde nichts gefunden.</p>
+      {{if .Query}}
+      <a href="/edit/{{.Query}}" class="btn btn-primary" style="margin-top:.75rem;">+ Neue Seite «{{.Query}}» erstellen</a>
+      {{end}}
+    </div>
+    {{end}}
+  </main>
+
+  <aside class="sidebar">
+    <div class="sidebar-card">
+      <div class="sidebar-header">Neue Suche</div>
+      <div style="padding:.9rem 1.1rem;">
+        <form action="/search" method="GET">
+          <input type="text" name="q" value="{{.Query}}" placeholder="Suchbegriff…"
+            style="width:100%;padding:.45rem .75rem;border:1px solid #c8ccd1;border-radius:6px;font-size:.875rem;outline:none;margin-bottom:.5rem;">
+          <button type="submit" class="btn btn-primary btn-block">Suchen</button>
+        </form>
+      </div>
+    </div>
+
+    {{if .Pages}}
+    <div class="sidebar-card">
+      <div class="sidebar-header">Letzte Änderungen</div>
+      <ul class="sidebar-list">
+        {{range .Pages}}
+        <li>
+          <a href="/view/{{.Name}}">
+            <span class="pg-name">{{.Name}}</span>
+            <span class="pg-date">{{.TimeStr}}</span>
+          </a>
+        </li>
+        {{end}}
+      </ul>
+    </div>
+    {{end}}
+  </aside>
+</div>
+{{template "footer" .}}
