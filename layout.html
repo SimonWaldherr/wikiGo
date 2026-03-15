@@ -1,0 +1,101 @@
+{{define "header"}}<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>wikiGo{{if .Title}} – {{.Title}}{{end}}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="page-wrapper">
+<nav class="navbar">
+  <div class="navbar-brand">
+    <a href="/"><span>📖</span> wikiGo</a>
+  </div>
+  <div class="navbar-search">
+    <form action="/search" method="GET" class="search-form">
+      <input type="text" name="q" class="search-input" placeholder="Wiki durchsuchen…" value="{{.Query}}">
+      <button type="submit" class="search-btn" title="Suchen">🔍</button>
+    </form>
+  </div>
+  <div class="navbar-links">
+    <a href="/" class="nav-link">Startseite</a>
+    <a href="/all" class="nav-link">Alle Seiten</a>
+    <a href="#" class="nav-link btn-new" id="nav-new-btn" title="Neue Seite erstellen">+ Neu</a>
+  </div>
+</nav>
+{{end}}
+
+{{define "footer"}}
+<footer class="wiki-footer">
+  <p>wikiGo &mdash; Wiki-Software auf Go-Basis &bull; Formatierung mit
+    <a href="https://github.com/SimonWaldherr/micromarkdownGo" target="_blank" rel="noopener">µMarkdown</a>
+    &bull; <a href="https://github.com/SimonWaldherr/wikiGo" target="_blank" rel="noopener">Quellcode auf GitHub</a>
+  </p>
+</footer>
+
+<!-- New-Page Modal -->
+<div id="new-page-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:10px;padding:1.75rem;width:100%;max-width:420px;box-shadow:0 8px 32px rgba(0,0,0,.22);margin:1rem;">
+    <h3 style="margin-bottom:1rem;font-size:1.1rem;">Neue Wiki-Seite erstellen</h3>
+    <form id="new-page-form">
+      <label style="display:block;font-size:.85rem;font-weight:600;margin-bottom:.4rem;" for="new-page-input">Seitenname</label>
+      <input id="new-page-input" type="text" placeholder="z.B. MeinThema oder Go_Tutorial"
+        style="width:100%;padding:.5rem .75rem;border:1px solid #c8ccd1;border-radius:6px;font-size:.95rem;outline:none;margin-bottom:.6rem;">
+      <p style="font-size:.78rem;color:#72777d;margin-bottom:1rem;">Erlaubt: Buchstaben, Zahlen, Unterstriche, Punkte, Bindestriche.</p>
+      <div style="display:flex;gap:.6rem;">
+        <button type="submit" class="btn btn-primary" style="flex:1;">Seite erstellen</button>
+        <button type="button" id="modal-close" class="btn btn-secondary">Abbrechen</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function() {
+  var modal   = document.getElementById('new-page-modal');
+  var openBtn = document.getElementById('nav-new-btn');
+  var closeBtn = document.getElementById('modal-close');
+  var form    = document.getElementById('new-page-form');
+  var input   = document.getElementById('new-page-input');
+
+  if (openBtn) {
+    openBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      modal.style.display = 'flex';
+      setTimeout(function(){ input.focus(); }, 50);
+    });
+  }
+  if (closeBtn) {
+    closeBtn.addEventListener('click', function() { modal.style.display = 'none'; });
+  }
+  modal.addEventListener('click', function(e) { if (e.target === modal) modal.style.display = 'none'; });
+
+  if (form) {
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      var name = input.value.trim().replace(/[^a-zA-Z0-9_.()-]+/g, '_').replace(/^_+|_+$/g, '');
+      if (name) window.location = '/edit/' + encodeURIComponent(name);
+    });
+  }
+
+  // Live preview for the editor
+  var textarea = document.getElementById('editor-textarea');
+  var previewEl = document.getElementById('preview-content');
+  if (textarea && previewEl) {
+    var timer;
+    function doPreview() {
+      var body = new URLSearchParams();
+      body.append('content', textarea.value);
+      fetch('/preview', { method: 'POST', body: body })
+        .then(function(r){ return r.text(); })
+        .then(function(html){ previewEl.innerHTML = html || '<em class="preview-placeholder">Noch keine Vorschau…</em>'; })
+        .catch(function(){ previewEl.textContent = textarea.value; });
+    }
+    textarea.addEventListener('input', function() { clearTimeout(timer); timer = setTimeout(doPreview, 400); });
+    doPreview();
+  }
+}());
+</script>
+</body>
+</html>
+{{end}}

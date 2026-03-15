@@ -4,29 +4,35 @@
     <div class="breadcrumb">
       <a href="/">Startseite</a>
       <span class="breadcrumb-sep">›</span>
-      <span>{{.Title}}</span>
+      <a href="/view/{{.Title}}">{{.Title}}</a>
+      <span class="breadcrumb-sep">›</span>
+      <span>Versionshistorie</span>
     </div>
     <div class="content-header">
-      <h1 class="page-title">{{.Title}}</h1>
+      <h1 class="page-title">📋 Versionshistorie</h1>
       <div class="content-actions">
-        <a href="/history/{{.Title}}" class="btn btn-outline btn-sm">📋 Versionen</a>
+        <a href="/view/{{.Title}}" class="btn btn-outline btn-sm">← Seite anzeigen</a>
         <a href="/edit/{{.Title}}" class="btn btn-primary btn-sm">✏️ Bearbeiten</a>
       </div>
     </div>
 
-    {{if .HTML}}
-    <div class="wiki-content">{{.HTML}}</div>
-    {{if .LastModified}}
-    <div class="page-info-bar">
-      <span>Zuletzt geändert: {{.LastModified}}</span>
-      <a href="/history/{{.Title}}">Versionshistorie anzeigen →</a>
+    {{if .History}}
+    <div class="history-list">
+      {{range $i, $rev := .History}}
+      <div class="revision-item">
+        <span class="rev-number{{if eq $i 0}} rev-badge-current{{end}}" title="Revisions-ID">#{{$rev.Id}}</span>
+        <div class="rev-info">
+          <div class="rev-date">{{$rev.TimeStr}}{{if eq $i 0}} <span class="badge">Aktuelle Version</span>{{end}}</div>
+          <div class="rev-ip">Bearbeitet von: {{$rev.IP}}</div>
+        </div>
+      </div>
+      {{end}}
     </div>
-    {{end}}
     {{else}}
     <div class="empty-state">
-      <div class="empty-icon">📄</div>
-      <h3>Diese Seite existiert noch nicht</h3>
-      <p>Klicke auf <strong>Seite erstellen</strong>, um Inhalte hinzuzufügen.</p>
+      <div class="empty-icon">📋</div>
+      <h3>Keine Versionshistorie</h3>
+      <p>Diese Seite wurde noch nie gespeichert.</p>
       <a href="/edit/{{.Title}}" class="btn btn-primary">✏️ Seite erstellen</a>
     </div>
     {{end}}
@@ -36,8 +42,8 @@
     <div class="sidebar-card">
       <div class="sidebar-header">Aktionen</div>
       <ul class="sidebar-list">
+        <li><a href="/view/{{.Title}}"><span class="pg-name">👁 Seite anzeigen</span></a></li>
         <li><a href="/edit/{{.Title}}"><span class="pg-name">✏️ Bearbeiten</span></a></li>
-        <li><a href="/history/{{.Title}}"><span class="pg-name">📋 Versionshistorie</span></a></li>
       </ul>
     </div>
 

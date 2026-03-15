@@ -1,0 +1,55 @@
+{{template "header" .}}
+<div class="content-wrapper">
+  <main class="main-content">
+    <div class="content-header">
+      <h1 class="page-title">📚 Alle Seiten</h1>
+      <div class="content-actions">
+        <a href="/" class="btn btn-outline btn-sm">← Startseite</a>
+      </div>
+    </div>
+
+    {{if .Pages}}
+    <div class="pages-section">
+      <div class="pages-grid">
+        {{range .Pages}}
+        <div class="page-card">
+          <a href="/view/{{.Name}}" class="page-card-title">{{.Name}}</a>
+          <div class="page-card-meta">Zuletzt: {{.TimeStr}}</div>
+        </div>
+        {{end}}
+      </div>
+    </div>
+    {{else}}
+    <div class="empty-state">
+      <div class="empty-icon">📚</div>
+      <h3>Keine Seiten vorhanden</h3>
+      <p>Erstelle deine erste Wiki-Seite.</p>
+      <a href="#" class="btn btn-primary" id="all-new-btn" onclick="document.getElementById('nav-new-btn').click();return false;">+ Neue Seite</a>
+    </div>
+    {{end}}
+  </main>
+
+  <aside class="sidebar">
+    <div class="sidebar-card">
+      <div class="sidebar-header">Neue Seite</div>
+      <div class="new-page-form">
+        <form id="all-new-form">
+          <input type="text" id="all-new-input" placeholder="Seitenname…">
+          <button type="submit" class="btn btn-primary btn-block">+ Erstellen</button>
+        </form>
+      </div>
+    </div>
+  </aside>
+</div>
+<script>
+(function(){
+  var f = document.getElementById('all-new-form');
+  var i = document.getElementById('all-new-input');
+  if (f) f.addEventListener('submit', function(e){
+    e.preventDefault();
+    var name = i.value.trim().replace(/[^a-zA-Z0-9_.()-]+/g,'_').replace(/^_+|_+$/g,'');
+    if (name) window.location = '/edit/' + encodeURIComponent(name);
+  });
+}());
+</script>
+{{template "footer" .}}
